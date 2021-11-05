@@ -1,0 +1,221 @@
+import java.util.ArrayList;
+import javax.swing.JFrame;
+import java.awt.event.KeyListener;
+import java.awt.event.KeyEvent;
+import java.util.*;
+import java.awt.geom.Line2D;
+
+
+public class Main {
+
+   public static TspPanel screen;
+   static int arraySizeX;
+   static int arraySizeY;
+
+   public static int findDistance(ArrayList<Node> nodesX) {
+      int distance =0;
+      for(int i=0;i<nodesX.size()-1;i++){
+         distance += nodesX.get(i).dist(nodesX.get(i+1));
+      }
+      distance += nodesX.get(nodesX.size()-1).dist(nodesX.get(0));
+      return distance;
+   }
+   
+   //nodes sizeXsize
+   public static ArrayList<Node> addRandomNodes(int sizeX, int sizeY, int number) {
+      ArrayList<Node> nodesX = new ArrayList();
+      arraySizeX=sizeX;
+      arraySizeY=sizeY;
+      for(int i=0;i<number;i++){
+         nodesX.add(new Node("N"+i,(int)((Math.random()*sizeX)),(int)((Math.random()*sizeY))));
+         boolean fail=false;
+         do{
+            if(fail){
+               nodesX.get(i).setX((int)((Math.random()*sizeX)));
+               nodesX.get(i).setY((int)((Math.random()*sizeY)));
+            }
+            fail=false;
+            for(int j=0;j<nodesX.size();j++){
+               if(nodesX.get(i).getX()==nodesX.get(j).getX()||nodesX.get(i).getY()==nodesX.get(j).getY()){
+                  fail=true;
+               }
+            }
+         }while(!fail);
+         System.out.println(nodesX.get(i).getX()+","+nodesX.get(i).getY());
+      }
+      return nodesX;
+   }
+
+
+   public static void main(String[] args) {
+   
+      ArrayList<Node> nodes = new ArrayList();
+   
+      int screenXsize=1000;
+      int screenYSize=1000;         
+      nodes = addRandomNodes(25, 25, 7);  
+      //nodes = sortB(nodes);
+      
+      Scanner in = new Scanner(System.in);
+      System.out.println("Please enter 'A', 'B', or 'C' for your sort type");
+      String ans = in.next();
+      if(ans.equalsIgnoreCase("A")){
+         long start = System.currentTimeMillis();
+         nodes = sortA(nodes);
+         System.out.println("The best distance from Sort A is "+findDistance(nodes)+".");
+         long finish = System.currentTimeMillis();
+         long timeElapsed = finish - start;
+         System.out.println(timeElapsed/1000.0+" seconds to finish Sort A.");
+      }else if (ans.equalsIgnoreCase("B")) {
+         nodes = sortB(nodes);
+      } else {
+         long start = System.currentTimeMillis();
+         nodes = sortC(nodes);
+         System.out.println("The best distance after Sort C is "+findDistance(nodes)+".");
+         long finish = System.currentTimeMillis();
+         long timeElapsed = finish - start;
+         System.out.println(timeElapsed/1000.0+" seconds to finish Sort C.");
+      }
+
+
+      screen = new TspPanel(screenXsize,screenYSize,arraySizeY,arraySizeX,nodes);
+      JFrame frame = new JFrame("Traveling Salesmen Solver");	//window title
+      frame.setSize(screenXsize, screenYSize);					//Size of game window
+      frame.setLocation(100, 50);				//location of game window on the screen
+      frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+      frame.setContentPane(screen);		
+      frame.setVisible(true);
+      
+   }
+      
+      
+   public static ArrayList<Node> sortA(ArrayList<Node> nodes){
+      Node firstNode = nodes.get(0);
+      for (int i = 0; i < nodes.size(); i++) {
+         Node shortest = null;
+         int shortestIndex = -1;
+         for (int j = i+1; j < nodes.size(); j++) {
+            if (j != i && nodes.get(j).getInputNode() == null && nodes.get(j).getOutputNode()== null) {
+               if (shortest == null) {
+                  shortest = nodes.get(j);
+                  shortestIndex = j;
+                  continue;
+               }         
+               if (nodes.get(i).dist(shortest) > nodes.get(i).dist(nodes.get(j))) {
+                  shortest = nodes.get(j);
+                  shortestIndex = j;
+               }
+            }
+         }
+         if(shortest==null){
+            shortest = firstNode;
+         }
+         nodes.get(i).setOutputNode(shortest);
+         shortest.setInputNode(nodes.get(i));
+         if(i!=nodes.size()-1){
+            swap(nodes, i+1, shortestIndex);
+         }
+      }
+      for(int i=0;i<nodes.size();i++){
+         System.out.println(nodes.get(i));
+      }
+      return nodes;
+   }
+   
+   public static ArrayList<Node> sortB(ArrayList<Node> nodes){
+      int ants = 100;
+      int bestAntDistance = 0;
+      int bestAntIndex = -1; // do
+      ArrayList<Edge>[] antPaths = new ArrayList()[ants]; // these
+      Edges edges = new Edges(nodes);
+      for (int ant = 0; ant < ants; ant++) {
+         Node firstNode = nodes.get(0);
+         double distance = 0;
+         edges.reset();
+         for (int i = 0; i < nodes.size(); i++) {
+            Node choice = null;
+            int choiceIndex = -1;
+            for (int j = 0; j < nodes.size(); j++) {
+               if (j != i && nodes.get(j).getInputNode() == null && nodes.get(j).getOutputNode()== null) {
+                  if (choice == null) {
+                     choice = nodes.get(j);
+                     choiceIndex = j;
+                     continue;
+                  }         
+                  if (Edge.score(edges.find(nodes.get(i), nodes.get(j))) > Edge.score(edges.find(nodes.get(i), choice))) {
+                     choice = nodes.get(j);
+                     choiceIndex = j;
+                  }
+               }
+            }
+            if(choice==null){
+               choice = firstNode;
+            }
+            nodes.get(i).setOutputNode(choice);
+            choice.setInputNode(nodes.get(i));
+            edges.find(nodes.get(i), choice).addDeposit();
+            distance += nodes.get(i).dist(choice);
+            antPaths[ant].add(edges.find(nodes.get(i), choice));
+            if(i!=nodes.size()-1){
+               swap(nodes, i+1, choiceIndex);
+            }
+         }
+         for(int i=0;i<nodes.size();i++){
+            System.out.println(nodes.get(i));
+         }
+         return nodes;
+      }
+   return null;
+   }
+	  
+
+	 public static ArrayList<Node> sortC(ArrayList<Node> nodes){
+      nodes = sortA(nodes);
+      int currentDist=findDistance(nodes);
+      System.out.println("The best distance from Sort A is "+currentDist+".");
+      boolean improved = true;
+      while(improved){
+         improved = false;
+         for(int i=0;i<nodes.size()-1;i++){
+            for(int j=i+1;j<nodes.size();j++){
+               ArrayList<Node> tempNodes =new ArrayList();
+               for(int u=0;u<nodes.size();u++){
+                  tempNodes.add(nodes.get(u));
+               }
+               int counter=0;
+               for(int k=0;k<nodes.size();k++){
+                  if(k>=i&&k<=j){
+                     tempNodes.set(k,nodes.get(j-counter)); 
+                     counter++;
+                  }
+               }
+               int newDist=findDistance(tempNodes);
+               if(newDist<currentDist){
+                  for(int u=0;u<tempNodes.size()-1;u++){
+                     nodes.set(u,tempNodes.get(u));
+                  }
+                  currentDist = newDist;
+                  improved = true;
+               }
+            }
+         }
+      }
+      for(int i=0;i<nodes.size()-1;i++){
+         nodes.get(i).setOutputNode(nodes.get(i+1));
+         nodes.get(i+1).setInputNode(nodes.get(i));
+      }
+      nodes.get(nodes.size()-1).setOutputNode(nodes.get(0));
+      nodes.get(0).setInputNode(nodes.get(nodes.size()-1));
+      // for(int i=0;i<nodes.size();i++){
+//          System.out.println(nodes.get(i));
+//       }
+      return nodes;
+   }   
+	
+   public static void swap(ArrayList<Node> list, int i1, int i2) {
+      Node temp = list.get(i2);
+      list.set(i2, list.get(i1));
+      list.set(i1, temp);
+   }
+
+}
